@@ -1077,29 +1077,42 @@ function buildCardPayload() {
 
   const widgets = [];
 
-  // ── 기본 정보 (plain text, 줄바꿈 \n) ──
-  const lines = [];
-  lines.push(`프로젝트명 : ${proj}`);
-  lines.push(`${isEnd ? '검증 기간' : '예상 검증 기간'} : ${period}`);
-  lines.push(`테스트 서버 : ${currentServer}`);
-  lines.push(`담당 QA : ${qa}`);
+  // ── 기본 정보 ──
+  // 프로젝트명: 링크 있으면 keyValue(우측 버튼), 없으면 텍스트 포함
+  if (plink) {
+    widgets.push({ keyValue: {
+      topLabel: '프로젝트명',
+      content:  proj,
+      button:   { textButton: { text: '링크 열기', onClick: { openLink: { url: plink } } } }
+    }});
+  }
+  const infoLines = [];
+  if (!plink) infoLines.push(`프로젝트명 : ${proj}`);
+  infoLines.push(`${isEnd ? '검증 기간' : '예상 검증 기간'} : ${period}`);
+  infoLines.push(`테스트 서버 : ${currentServer}`);
+  infoLines.push(`담당 QA : ${qa}`);
   if (isMid) {
     const cur  = v('mid-progress-cur');
     const goal = v('mid-progress-goal');
     const mp   = cur ? (goal ? `${cur}% (목표 진행률: ${goal}%)` : `${cur}%`) : '';
-    if (mp) lines.push(`누적 진행률 : ${mp}`);
+    if (mp) infoLines.push(`누적 진행률 : ${mp}`);
   }
-  widgets.push({ textParagraph: { text: lines.join('\n') } });
-
-  // 프로젝트 링크 버튼
-  if (plink) widgets.push({ buttons: [textBtn('프로젝트 링크', plink)] });
+  widgets.push({ textParagraph: { text: infoLines.join('\n') } });
 
   // ── 시작: TC + 기기 + 이슈 ──
   if (isStart) {
     const tc     = v('tc');
     const tclink = v('tclink');
-    widgets.push({ textParagraph: { text: `테스트 케이스 개수\n• 전체 TC: ${tc || '-'}개` } });
-    if (tclink) widgets.push({ buttons: [textBtn('TC 링크', tclink)] });
+    // TC 링크 있으면 keyValue(우측 버튼), 없으면 textParagraph
+    if (tclink) {
+      widgets.push({ keyValue: {
+        topLabel: '테스트 케이스 개수',
+        content:  `전체 TC: ${tc || '-'}개`,
+        button:   { textButton: { text: 'TC 링크', onClick: { openLink: { url: tclink } } } }
+      }});
+    } else {
+      widgets.push({ textParagraph: { text: `테스트 케이스 개수\n• 전체 TC: ${tc || '-'}개` } });
+    }
 
     if (t === 'integrated-start') {
       const devs = getDevices();
@@ -1127,18 +1140,35 @@ function buildCardPayload() {
     const pGoal   = isFullEnd ? v('r-progress-goal') : '';
     const prog    = pCur ? (pGoal ? `${pCur}% (목표 진행률: ${pGoal}%)` : `${pCur}%`) : '';
 
-    let tcLines = [
-      `테스트 진행 현황`,
-      `• 전체 TC : ${total || '-'}건`,
-      `✅ PASS : ${pass || '-'}건`,
-      `🔧 FIXED : ${fixed || '-'}건`,
-      `❌ FAIL : ${fail || '-'}건`,
-      `⏸ N/T : ${nt || '-'}건`,
-      `— N/A : ${na || '-'}건`
-    ];
-    if (prog) tcLines.push(`• 누적 진행률: ${prog}`);
-    widgets.push({ textParagraph: { text: tcLines.join('\n') } });
-    if (rtclink) widgets.push({ buttons: [textBtn('TC 상세 보기', rtclink)] });
+    // TC 상세 링크 있으면 첫 줄을 keyValue로
+    if (rtclink) {
+      widgets.push({ keyValue: {
+        topLabel: '테스트 진행 현황',
+        content:  `전체 TC : ${total || '-'}건`,
+        button:   { textButton: { text: 'TC 상세', onClick: { openLink: { url: rtclink } } } }
+      }});
+      const statLines = [
+        `✅ PASS : ${pass || '-'}건`,
+        `🔧 FIXED : ${fixed || '-'}건`,
+        `❌ FAIL : ${fail || '-'}건`,
+        `⏸ N/T : ${nt || '-'}건`,
+        `— N/A : ${na || '-'}건`
+      ];
+      if (prog) statLines.push(`• 누적 진행률: ${prog}`);
+      widgets.push({ textParagraph: { text: statLines.join('\n') } });
+    } else {
+      const tcLines = [
+        `테스트 진행 현황`,
+        `• 전체 TC : ${total || '-'}건`,
+        `✅ PASS : ${pass || '-'}건`,
+        `🔧 FIXED : ${fixed || '-'}건`,
+        `❌ FAIL : ${fail || '-'}건`,
+        `⏸ N/T : ${nt || '-'}건`,
+        `— N/A : ${na || '-'}건`
+      ];
+      if (prog) tcLines.push(`• 누적 진행률: ${prog}`);
+      widgets.push({ textParagraph: { text: tcLines.join('\n') } });
+    }
   }
 
   // ── 결과 요약 ──
@@ -1154,17 +1184,28 @@ function buildCardPayload() {
   // ── 잔여 이슈 ──
   if (isMid || isEnd) {
     const ilink = v('i-link');
-    let issueLines = ['잔여 이슈 현황'];
-    if (isNoIssues()) {
-      issueLines.push('• 없음');
+    const issueContent = isNoIssues() ? '없음'
+      : `Critical: ${v('i-critical')||'0'}건  High: ${v('i-high')||'0'}건  Medium: ${v('i-medium')||'0'}건  Low: ${v('i-low')||'0'}건`;
+
+    if (ilink) {
+      widgets.push({ keyValue: {
+        topLabel: '잔여 이슈 현황',
+        content:  issueContent,
+        contentMultiline: false,
+        button:   { textButton: { text: '이슈 보기', onClick: { openLink: { url: ilink } } } }
+      }});
     } else {
-      issueLines.push(`• Critical: ${v('i-critical') || '0'}건`);
-      issueLines.push(`• High: ${v('i-high') || '0'}건`);
-      issueLines.push(`• Medium: ${v('i-medium') || '0'}건`);
-      issueLines.push(`• Low: ${v('i-low') || '0'}건`);
+      let issueLines = ['잔여 이슈 현황'];
+      if (isNoIssues()) {
+        issueLines.push('• 없음');
+      } else {
+        issueLines.push(`• Critical: ${v('i-critical')||'0'}건`);
+        issueLines.push(`• High: ${v('i-high')||'0'}건`);
+        issueLines.push(`• Medium: ${v('i-medium')||'0'}건`);
+        issueLines.push(`• Low: ${v('i-low')||'0'}건`);
+      }
+      widgets.push({ textParagraph: { text: issueLines.join('\n') } });
     }
-    widgets.push({ textParagraph: { text: issueLines.join('\n') } });
-    if (ilink) widgets.push({ buttons: [textBtn('잔여 이슈 보기', ilink)] });
   }
 
   // ── 중요 이슈 + 리스크 ──
