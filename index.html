@@ -1093,7 +1093,7 @@ function buildCardPayload() {
   }
   widgets.push({ textParagraph: { text: basic } });
   // 프로젝트 링크 버튼
-  if (plink) widgets.push({ buttonList: { buttons: [btn('프로젝트 링크 열기', plink)] } });
+  if (plink) widgets.push({ buttons: [btn('프로젝트 링크 열기', plink)] });
 
   // ── 시작: TC + 기기 + 이슈 ──
   if (isStart) {
@@ -1101,7 +1101,7 @@ function buildCardPayload() {
     const tclink = v('tclink');
     let tcTxt    = `<b>테스트 케이스 개수</b><br>• 전체 TC: ${tc || '-'}개`;
     widgets.push({ textParagraph: { text: tcTxt } });
-    if (tclink) widgets.push({ buttonList: { buttons: [btn('TC 링크', tclink)] } });
+    if (tclink) widgets.push({ buttons: [btn('TC 링크', tclink)] });
 
     if (t === 'integrated-start') {
       const devs = getDevices();
@@ -1115,7 +1115,7 @@ function buildCardPayload() {
     widgets.push({ textParagraph: {
       text: '⚠️ 테스트 중 발생하는 이슈는 아래 이슈 목록 페이지에서 멘션드리겠습니다.'
     }});
-    if (issuelink) widgets.push({ buttonList: { buttons: [btn(issLabel, issuelink)] } });
+    if (issuelink) widgets.push({ buttons: [btn(issLabel, issuelink)] });
   }
 
   // ── TC 진행 현황 ──
@@ -1140,7 +1140,7 @@ function buildCardPayload() {
         tcRes += `— N/A : ${na || '-'}건`;
     if (prog) tcRes += `<br>• 누적 진행률: ${prog}`;
     widgets.push({ textParagraph: { text: tcRes } });
-    if (rtclink) widgets.push({ buttonList: { buttons: [btn('TC 상세 보기', rtclink)] } });
+    if (rtclink) widgets.push({ buttons: [btn('TC 상세 보기', rtclink)] });
   }
 
   // ── 결과 요약 ──
@@ -1166,7 +1166,7 @@ function buildCardPayload() {
       issueTxt += `• Low: ${v('i-low') || '0'}건`;
     }
     widgets.push({ textParagraph: { text: issueTxt } });
-    if (ilink) widgets.push({ buttonList: { buttons: [btn('잔여 이슈 보기', ilink)] } });
+    if (ilink) widgets.push({ buttons: [btn('잔여 이슈 보기', ilink)] });
   }
 
   // ── 중요 이슈 + 리스크 (중간보고) ──
@@ -1208,20 +1208,19 @@ function buildCardPayload() {
     }
   }
 
-  // cardsV2 포맷 (구글챗 최신 웹훅 표준)
+  // cards v1 포맷 (webhook 표준)
   return {
-    cardsV2: [{
-      cardId: 'qa-notification',
-      card: { sections: [{ widgets }] }
-    }]
+    cards: [{ sections: [{ widgets }] }]
   };
 }
 
-// 버튼 위젯 헬퍼
+// v1 버튼 위젯 헬퍼
 function btn(label, url) {
   return {
-    text: label,
-    onClick: { openLink: { url } }
+    textButton: {
+      text: label,
+      onClick: { openLink: { url } }
+    }
   };
 }
 
@@ -1250,7 +1249,7 @@ async function sendToChat() {
   statusEl.textContent = '';
 
   try {
-    // cardsV2 포맷: buttonList 위젯으로 라벨 링크 지원
+    // cards v1: buttonList → buttons (v1 webhook 표준)
     const payload = buildCardPayload();
 
     await fetch(scriptUrl, {
