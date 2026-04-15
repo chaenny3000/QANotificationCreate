@@ -1053,6 +1053,7 @@ function addChannel() {
   const channels = getChannels();
   channels.push({ name, url });
   saveChannels(channels);
+  syncChannelsToScript(channels);
   document.getElementById('cfg-ch-name').value = '';
   document.getElementById('cfg-ch-url').value  = '';
   renderChannelList();
@@ -1063,8 +1064,55 @@ function removeChannel(idx) {
   const channels = getChannels();
   channels.splice(idx, 1);
   saveChannels(channels);
+  syncChannelsToScript(channels);
   renderChannelList();
   updateSendBtn();
+}
+
+// Apps Script PropertiesService에 채널 동기화 (form submit)
+function syncChannelsToScript(channels) {
+  const scriptUrl = localStorage.getItem('qa_cfg_script');
+  if (!scriptUrl) return;
+  const frame = document.createElement('iframe');
+  frame.name = 'qa-sync-frame'; frame.style.display = 'none';
+  document.body.appendChild(frame);
+  const form = document.createElement('form');
+  form.method = 'POST'; form.action = scriptUrl; form.target = 'qa-sync-frame';
+  const field = document.createElement('input');
+  field.type = 'hidden'; field.name = 'data';
+  field.value = JSON.stringify({ action: 'saveChannels', channels });
+  form.appendChild(field);
+  document.body.appendChild(form);
+  form.submit();
+  document.body.removeChild(form);
+  setTimeout(() => { if (frame.parentNode) frame.parentNode.removeChild(frame); }, 5000);
+}
+
+// Apps Script에서 채널 불러오기 (JSONP)
+function loadChannelsFromScript() {
+  const scriptUrl = localStorage.getItem('qa_cfg_script');
+  if (!scriptUrl) return;
+  window._qaHandleChannels = function(channels) {
+    const localChannels = getChannels();
+    if (Array.isArray(channels) && channels.length > 0) {
+      // Apps Script에 데이터 있으면 덮어씀 (최신 기준)
+      saveChannels(channels);
+      renderChannelList();
+      updateSendBtn();
+      const hint = document.getElementById('ls-hint');
+      if (hint) { hint.textContent = '채널 동기화됨'; setTimeout(() => { hint.textContent = ''; }, 2500); }
+    } else if (localChannels.length > 0) {
+      // Apps Script 비어있고 로컬에 있으면 → 로컬 채널을 Apps Script로 업로드
+      syncChannelsToScript(localChannels);
+    }
+    const el = document.getElementById('sync-status');
+    if (el) el.remove();
+  };
+  const script = document.createElement('script');
+  script.src = `${scriptUrl}?action=getChannels&callback=_qaHandleChannels&t=${Date.now()}`;
+  script.onerror = () => { const el = document.getElementById('sync-status'); if (el) el.remove(); };
+  script.id = 'sync-status';
+  document.head.appendChild(script);
 }
 
 function renderChannelList() {
@@ -1113,6 +1161,8 @@ function loadSettings() {
   document.getElementById('cfg-script').value = localStorage.getItem('qa_cfg_script') || '';
   renderChannelList();
   updateSendBtn();
+  // Apps Script에서 최신 채널 목록 불러오기 (기기간 동기화)
+  loadChannelsFromScript();
 }
 
 function toggleSettings() {
