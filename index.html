@@ -1039,6 +1039,7 @@ function generate() {
   box.style.whiteSpace = '';
   rawText  = buildPlainText();
   editMode = false;
+  isEdited = false;
   const editBtn = document.getElementById('editbtn');
   editBtn.style.display = '';
   editBtn.textContent   = '✏️ 편집';
@@ -1435,8 +1436,10 @@ async function sendToChat() {
 
   try {
     // 편집 모드면 수정된 텍스트로, 아니면 카드 포맷으로 전송
-    if (editMode) rawText = document.getElementById('output').innerText;
-    const chatPayload = editMode ? { text: rawText } : buildCardPayload();
+    // 편집된 내용이 있으면 text 포맷으로, 없으면 카드 포맷으로 전송
+    const currentText = (editMode || isEdited) ? document.getElementById('output').innerText : null;
+    if (currentText) rawText = currentText;
+    const chatPayload = (editMode || isEdited) ? { text: rawText } : buildCardPayload();
     const sendData = JSON.stringify({
       webhookUrl,
       payload: chatPayload
@@ -1479,6 +1482,7 @@ async function sendToChat() {
 // 편집 모드
 // ─────────────────────────────────────────
 let editMode = false;
+let isEdited = false;
 
 function toggleEdit() {
   const box = document.getElementById('output');
@@ -1494,12 +1498,12 @@ function toggleEdit() {
     btn.classList.add('editing');
     box.focus();
   } else {
-    // 편집 완료 → 수정된 텍스트 저장 후 그대로 보여주기 (원본으로 되돌리지 않음)
-    rawText = box.innerText;
+    rawText  = box.innerText;
+    isEdited = true;
     box.contentEditable = 'false';
     box.classList.remove('editing');
     box.style.whiteSpace = 'pre-wrap';
-    box.innerText = rawText;   // 수정된 내용 그대로 유지
+    box.innerText = rawText;
     btn.textContent = '✏️ 다시 편집';
     btn.classList.remove('editing');
   }
@@ -1511,8 +1515,7 @@ const copyIcon  = () => '<svg width="11" height="11" viewBox="0 0 16 16" fill="n
 const checkIcon = () => '<svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8l4 4 6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 function copyText() {
-  // 편집 모드 중이면 현재 textarea 내용 사용
-  if (editMode) {
+  if (editMode || isEdited) {
     rawText = document.getElementById('output').innerText;
   }
   if (!rawText) return;
