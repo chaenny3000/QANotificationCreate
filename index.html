@@ -1249,8 +1249,8 @@ async function sendToChat() {
   statusEl.textContent = '';
 
   try {
-    // cards v1: buttonList → buttons (v1 webhook 표준)
-    const payload = buildCardPayload();
+    // text 포맷: 검증된 방식. 실제 https:// URL 입력 시 Google Chat이 자동 하이퍼링크 처리
+    const payload = { text: buildPlainText(true) };
 
     await fetch(scriptUrl, {
       method: 'POST',
