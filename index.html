@@ -1077,12 +1077,11 @@ function buildCardPayload() {
 
   const widgets = [];
 
-  // 타이틀
+  // ── 타이틀 ──
   widgets.push({ textParagraph: { text: `<b>${type.emoji} ${type.title}</b>` } });
 
-  // 기본 정보
-  const projLink = plink ? `<a href="${plink}">${proj}</a>` : proj;
-  let basic = `<b>프로젝트명</b> : ${projLink}<br>`;
+  // ── 기본 정보 ──
+  let basic = `<b>프로젝트명</b> : ${proj}<br>`;
   basic    += `<b>${isEnd ? '검증 기간' : '예상 검증 기간'}</b> : ${period}<br>`;
   basic    += `<b>테스트 서버</b> : ${currentServer}<br>`;
   basic    += `<b>담당 QA</b> : ${qa}`;
@@ -1093,14 +1092,16 @@ function buildCardPayload() {
     if (mp) basic += `<br>• 누적 진행률: ${mp}`;
   }
   widgets.push({ textParagraph: { text: basic } });
+  // 프로젝트 링크 버튼
+  if (plink) widgets.push({ buttonList: { buttons: [btn('프로젝트 링크 열기', plink)] } });
 
-  // 시작: TC + 기기 + 이슈
+  // ── 시작: TC + 기기 + 이슈 ──
   if (isStart) {
     const tc     = v('tc');
     const tclink = v('tclink');
     let tcTxt    = `<b>테스트 케이스 개수</b><br>• 전체 TC: ${tc || '-'}개`;
-    if (tclink) tcTxt += `<br>　ㄴ <a href="${tclink}">TC 링크</a>`;
     widgets.push({ textParagraph: { text: tcTxt } });
+    if (tclink) widgets.push({ buttonList: { buttons: [btn('TC 링크', tclink)] } });
 
     if (t === 'integrated-start') {
       const devs = getDevices();
@@ -1110,13 +1111,14 @@ function buildCardPayload() {
     }
 
     const issuelink = v('issuelink');
-    const issLabel  = t === 'ops-start' ? '운영 이슈 목록' : '이슈목록';
-    let issTxt = '⚠️ 테스트 중 발생하는 이슈는 아래 이슈 목록 페이지에서 멘션드리겠습니다.<br>';
-    issTxt    += issuelink ? `• <a href="${issuelink}">${issLabel}</a>` : '• (링크)';
-    widgets.push({ textParagraph: { text: issTxt } });
+    const issLabel  = t === 'ops-start' ? '운영 이슈 목록' : '이슈 목록';
+    widgets.push({ textParagraph: {
+      text: '⚠️ 테스트 중 발생하는 이슈는 아래 이슈 목록 페이지에서 멘션드리겠습니다.'
+    }});
+    if (issuelink) widgets.push({ buttonList: { buttons: [btn(issLabel, issuelink)] } });
   }
 
-  // TC 진행 현황 (중간 + 통합 종료)
+  // ── TC 진행 현황 ──
   if (hasResult) {
     const total   = v('r-total');
     const rtclink = v('r-tclink');
@@ -1129,10 +1131,8 @@ function buildCardPayload() {
     const pGoal   = isFullEnd ? v('r-progress-goal') : '';
     const prog    = pCur ? (pGoal ? `${pCur}% (목표 진행률: ${pGoal}%)` : `${pCur}%`) : '';
 
-    const tcHead = rtclink
-      ? `<b>테스트 진행 현황</b> 🔗 <a href="${rtclink}">TC 상세 보기</a>`
-      : '<b>테스트 진행 현황</b>';
-    let tcRes  = `${tcHead}<br>• 전체 TC : ${total || '-'}건<br>`;
+    let tcRes  = `<b>테스트 진행 현황</b><br>`;
+        tcRes += `• 전체 TC : ${total || '-'}건<br>`;
         tcRes += `✅ PASS : ${pass || '-'}건<br>`;
         tcRes += `🔧 FIXED : ${fixed || '-'}건<br>`;
         tcRes += `❌ FAIL : ${fail || '-'}건<br>`;
@@ -1140,9 +1140,10 @@ function buildCardPayload() {
         tcRes += `— N/A : ${na || '-'}건`;
     if (prog) tcRes += `<br>• 누적 진행률: ${prog}`;
     widgets.push({ textParagraph: { text: tcRes } });
+    if (rtclink) widgets.push({ buttonList: { buttons: [btn('TC 상세 보기', rtclink)] } });
   }
 
-  // 결과 요약 (탐색/운영 종료)
+  // ── 결과 요약 ──
   if (isSimpleEnd) {
     const lines = (v('s-summary') || '').split('\n').filter(l => l.trim());
     if (lines.length > 0) {
@@ -1152,13 +1153,10 @@ function buildCardPayload() {
     }
   }
 
-  // 잔여 이슈 (중간 + 종료)
+  // ── 잔여 이슈 ──
   if (isMid || isEnd) {
     const ilink = v('i-link');
-    const iHead = ilink
-      ? `<b>잔여 이슈 현황</b> 🔗 <a href="${ilink}">잔여 이슈 보기</a>`
-      : '<b>잔여 이슈 현황</b>';
-    let issueTxt = iHead + '<br>';
+    let issueTxt = '<b>잔여 이슈 현황</b><br>';
     if (isNoIssues()) {
       issueTxt += '• 없음';
     } else {
@@ -1168,9 +1166,10 @@ function buildCardPayload() {
       issueTxt += `• Low: ${v('i-low') || '0'}건`;
     }
     widgets.push({ textParagraph: { text: issueTxt } });
+    if (ilink) widgets.push({ buttonList: { buttons: [btn('잔여 이슈 보기', ilink)] } });
   }
 
-  // 중요 이슈 + 리스크 (중간보고)
+  // ── 중요 이슈 + 리스크 (중간보고) ──
   if (isMid) {
     const keyLines = (v('key-issues') || '').split('\n').filter(l => l.trim());
     if (keyLines.length > 0) {
@@ -1186,7 +1185,7 @@ function buildCardPayload() {
     }
   }
 
-  // 배포 (종료)
+  // ── 배포 ──
   if (isEnd) {
     const satisfy = DEPLOY_DATA[currentDeploy].satisfy;
     const opinion = v('d-opinion') || DEPLOY_DATA[currentDeploy].opinion;
@@ -1195,7 +1194,7 @@ function buildCardPayload() {
     }});
   }
 
-  // 비고 (탐색/운영 종료 제외)
+  // ── 비고 ──
   if (!isSimpleEnd) {
     const note        = v('note');
     const defaultNote = '테스트 중 기획, 디자인, 개발 내용에 변경 사항이 있을 경우 사전 공유 부탁드립니다.';
@@ -1209,7 +1208,21 @@ function buildCardPayload() {
     }
   }
 
-  return { cards: [{ sections: [{ widgets }] }] };
+  // cardsV2 포맷 (구글챗 최신 웹훅 표준)
+  return {
+    cardsV2: [{
+      cardId: 'qa-notification',
+      card: { sections: [{ widgets }] }
+    }]
+  };
+}
+
+// 버튼 위젯 헬퍼
+function btn(label, url) {
+  return {
+    text: label,
+    onClick: { openLink: { url } }
+  };
 }
 
 // ─────────────────────────────────────────
@@ -1237,8 +1250,8 @@ async function sendToChat() {
   statusEl.textContent = '';
 
   try {
-    // 전송용: URL 포함 (Google Chat이 자동으로 클릭 가능한 링크로 변환)
-    const payload = { text: buildPlainText(true) };
+    // cardsV2 포맷: buttonList 위젯으로 라벨 링크 지원
+    const payload = buildCardPayload();
 
     await fetch(scriptUrl, {
       method: 'POST',
