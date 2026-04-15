@@ -1226,20 +1226,27 @@ async function sendToChat() {
     statusEl.className   = 'send-status err';
     return;
   }
+  if (!rawText) {
+    statusEl.textContent = '⚠️ 먼저 공지 생성하기를 눌러주세요.';
+    statusEl.className   = 'send-status err';
+    return;
+  }
 
   btn.disabled  = true;
   btn.innerHTML = '전송 중…';
   statusEl.textContent = '';
 
   try {
-    // no-cors: CORS preflight 없이 전송 가능 (응답은 못 읽음 → 낙관적 처리)
+    // text 포맷: 카드보다 안정적, Google Chat 마크다운(*bold* 등) 지원
+    const payload = { text: rawText };
+
     await fetch(scriptUrl, {
       method: 'POST',
       mode:   'no-cors',
-      body:   JSON.stringify({ webhookUrl, payload: buildCardPayload() })
+      body:   JSON.stringify({ webhookUrl, payload })
     });
 
-    statusEl.textContent = '✅ 전송 요청 완료 — 구글챗에서 확인해주세요';
+    statusEl.textContent = '✅ 전송 완료 — 구글챗 확인해주세요';
     statusEl.className   = 'send-status ok';
 
   } catch (err) {
