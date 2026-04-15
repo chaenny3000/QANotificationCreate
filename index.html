@@ -863,7 +863,7 @@ function renderPreview() {
 // ─────────────────────────────────────────
 // Plain text 생성 (복사용)
 // ─────────────────────────────────────────
-function buildPlainText() {
+function buildPlainText(includeUrls = false) {
   const type      = TYPES[currentType];
   const proj      = v('proj') || '[프로젝트명]';
   const plink     = v('projlink');
@@ -886,7 +886,7 @@ function buildPlainText() {
   L.push(`*${type.emoji} ${type.title}*`);
   L.push('');
 
-  const projDisp = proj;
+  const projDisp = (includeUrls && plink) ? `${proj} (${plink})` : proj;
   L.push(`*프로젝트명* : ${projDisp}`);
   L.push(`*${isEnd ? '검증 기간' : '예상 검증 기간'}* : ${period}`);
   L.push(`*테스트 서버* : ${currentServer}`);
@@ -904,7 +904,7 @@ function buildPlainText() {
     L.push('');
     L.push('*테스트 케이스 개수*');
     L.push(`• 전체 TC: ${tc || '-'}개`);
-    if (tclink) L.push(`  ㄴ TC 링크`);
+    if (tclink) L.push(includeUrls ? `  ㄴ ${tclink}` : `  ㄴ TC 링크`);
 
     if (t === 'integrated-start') {
       const devs = getDevices();
@@ -917,7 +917,7 @@ function buildPlainText() {
     const issLabel  = t === 'ops-start' ? '운영 이슈 목록' : '이슈목록';
     L.push('');
     L.push('⚠️ 테스트 중 발생하는 이슈는 아래 이슈 목록 페이지에서 멘션드리겠습니다.');
-    L.push(`• ${issuelink ? issLabel : '(링크)'}`);
+    L.push(`• ${issuelink ? (includeUrls ? issuelink : issLabel) : '(링크)'}`);
   }
 
   if (hasResult) {
@@ -935,7 +935,7 @@ function buildPlainText() {
     })() : null;
 
     L.push('');
-    L.push(`*테스트 진행 현황*${rtclink ? ' 🔗 TC 상세 보기' : ''}`);
+    L.push(`*테스트 진행 현황*${rtclink ? (includeUrls ? ' 🔗 ' + rtclink : ' 🔗 TC 상세 보기') : ''}`);
     L.push(`• 전체 TC : ${total || '-'}건`);
     L.push(`✅ PASS : ${pass || '-'}건`);
     L.push(`🔧 FIXED : ${fixed || '-'}건`);
@@ -957,7 +957,7 @@ function buildPlainText() {
   if (isMid || isEnd) {
     const ilink = v('i-link');
     L.push('');
-    L.push(`*잔여 이슈 현황*${ilink ? ' 🔗 잔여 이슈 보기' : ''}`);
+    L.push(`*잔여 이슈 현황*${ilink ? (includeUrls ? ' 🔗 ' + ilink : ' 🔗 잔여 이슈 보기') : ''}`);
     if (isNoIssues()) {
       L.push('• 없음');
     } else {
@@ -1237,8 +1237,8 @@ async function sendToChat() {
   statusEl.textContent = '';
 
   try {
-    // text 포맷: 카드보다 안정적, Google Chat 마크다운(*bold* 등) 지원
-    const payload = { text: rawText };
+    // 전송용: URL 포함 (Google Chat이 자동으로 클릭 가능한 링크로 변환)
+    const payload = { text: buildPlainText(true) };
 
     await fetch(scriptUrl, {
       method: 'POST',
