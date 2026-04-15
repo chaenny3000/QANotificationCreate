@@ -126,14 +126,14 @@ textarea{resize:vertical;min-height:54px;line-height:1.6}
 .settings-toggle svg{transition:transform .2s}
 .settings-toggle.open svg{transform:rotate(180deg)}
 .settings-panel{width:100%;max-width:1040px;padding:0 20px;overflow:hidden;max-height:0;transition:max-height .25s ease}
-.settings-panel.open{max-height:200px}
+.settings-panel.open{max-height:600px}
 .settings-inner{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:0}
 .settings-inner .field{display:flex;flex-direction:column;gap:3px}
 .settings-desc{font-size:10.5px;color:var(--text-dim);margin-top:4px;line-height:1.5}
 .settings-inner input{font-family:'JetBrains Mono',monospace;font-size:11px}
 
 /* ── Send button ── */
-.btn-send{font-family:'Noto Sans KR',sans-serif;font-size:11.5px;font-weight:600;padding:4px 12px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;cursor:pointer;transition:opacity .15s;display:flex;align-items:center;gap:4px;white-space:nowrap}
+.btn-send{font-family:'Noto Sans KR',sans-serif;font-size:11.5px;font-weight:600;padding:4px 12px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;cursor:pointer;transition:opacity .15s;display:flex;align-items:center;gap:4px;white-space:nowrap;flex-shrink:0}
 .btn-send:hover{opacity:.84}
 .btn-send:disabled{opacity:.4;cursor:not-allowed}
 .send-status{font-size:11px;color:var(--text-dim);margin-top:4px;min-height:16px;text-align:right}
@@ -182,15 +182,23 @@ textarea{resize:vertical;min-height:54px;line-height:1.6}
 </div>
 <div class="settings-panel" id="settings-panel">
   <div class="settings-inner">
-    <div class="field">
-      <label>Google Chat Webhook URL</label>
-      <input id="cfg-webhook" type="text" placeholder="https://chat.googleapis.com/v1/spaces/..." />
-      <div class="settings-desc">구글챗 스페이스 → 앱 관리 → Webhook 추가 → URL 복사</div>
-    </div>
-    <div class="field">
+    <div class="field" style="grid-column:1/-1">
       <label>Apps Script 웹 앱 URL</label>
       <input id="cfg-script" type="text" placeholder="https://script.google.com/macros/s/.../exec" />
       <div class="settings-desc">제공된 .gs 파일 배포 후 웹 앱 URL 복사</div>
+    </div>
+    <div class="field" style="grid-column:1/-1">
+      <label>채널 추가</label>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input id="cfg-ch-name" type="text" placeholder="채널명 (예: 기획팀 우리만)" style="flex:1" />
+        <input id="cfg-ch-url"  type="text" placeholder="Webhook URL" style="flex:2;font-family:'JetBrains Mono',monospace;font-size:11px" />
+        <button onclick="addChannel()" style="font-family:'Noto Sans KR',sans-serif;font-size:12px;font-weight:600;padding:6px 12px;border-radius:6px;border:none;background:var(--accent);color:#fff;cursor:pointer;white-space:nowrap;flex-shrink:0">추가</button>
+      </div>
+      <div class="settings-desc">구글챗 스페이스 → 앱 관리 → Webhook 추가 → URL 복사</div>
+    </div>
+    <div class="field" style="grid-column:1/-1">
+      <label>등록된 채널</label>
+      <div id="cfg-ch-list" style="display:flex;flex-direction:column;gap:4px;margin-top:2px"></div>
     </div>
   </div>
 </div>
@@ -439,16 +447,22 @@ textarea{resize:vertical;min-height:54px;line-height:1.6}
 <div class="preview-col">
   <div class="preview-header">
     <div class="preview-label">미리보기</div>
-    <div style="display:flex;gap:6px;align-items:center">
+    <div style="display:flex;gap:6px;align-items:center;flex-shrink:0">
       <button class="btn-send" id="sendbtn" onclick="sendToChat()" disabled>
         <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M14 2L2 7l5 2 2 5 5-12z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-        구글챗 전송
+        전송
       </button>
       <button class="btn-copy" id="copybtn" onclick="copyText()">
         <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><rect x="5" y="5" width="9" height="9" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M3 11H2a1 1 0 01-1-1V2a1 1 0 011-1h8a1 1 0 011 1v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        복사하기
+        복사
       </button>
     </div>
+  </div>
+  <div style="display:flex;align-items:center;gap:6px">
+    <span style="font-size:11px;color:var(--text-dim);flex-shrink:0">전송 채널</span>
+    <select id="ch-select" style="font-size:12px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:'Noto Sans KR',sans-serif;flex:1;min-width:0">
+      <option value="">채널 선택</option>
+    </select>
   </div>
   <div class="send-status" id="send-status"></div>
   <div class="preview-box" id="output">
@@ -1023,17 +1037,81 @@ function generate() {
 }
 
 // ─────────────────────────────────────────
+// 채널 관리 (다중 웹훅)
+// ─────────────────────────────────────────
+function getChannels() {
+  try { return JSON.parse(localStorage.getItem('qa_cfg_channels') || '[]'); } catch { return []; }
+}
+function saveChannels(arr) {
+  localStorage.setItem('qa_cfg_channels', JSON.stringify(arr));
+}
+
+function addChannel() {
+  const name = document.getElementById('cfg-ch-name').value.trim();
+  const url  = document.getElementById('cfg-ch-url').value.trim();
+  if (!name || !url) { alert('채널명과 Webhook URL을 모두 입력해주세요.'); return; }
+  const channels = getChannels();
+  channels.push({ name, url });
+  saveChannels(channels);
+  document.getElementById('cfg-ch-name').value = '';
+  document.getElementById('cfg-ch-url').value  = '';
+  renderChannelList();
+  updateSendBtn();
+}
+
+function removeChannel(idx) {
+  const channels = getChannels();
+  channels.splice(idx, 1);
+  saveChannels(channels);
+  renderChannelList();
+  updateSendBtn();
+}
+
+function renderChannelList() {
+  const channels = getChannels();
+  const list     = document.getElementById('cfg-ch-list');
+  const sel      = document.getElementById('ch-select');
+
+  if (channels.length === 0) {
+    list.innerHTML = '<div style="font-size:11.5px;color:var(--text-dim);padding:4px 0">등록된 채널이 없어요</div>';
+  } else {
+    list.innerHTML = channels.map((ch, i) => `
+      <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--surface2);border-radius:6px;font-size:12px">
+        <span style="font-weight:600;flex:0 0 auto;min-width:80px">${ch.name}</span>
+        <span style="color:var(--text-dim);font-family:'JetBrains Mono',monospace;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${ch.url}</span>
+        <button onclick="editChannel(${i})" style="border:1px solid var(--border);background:var(--surface);color:var(--text-muted);cursor:pointer;font-size:11px;padding:2px 8px;border-radius:4px;flex-shrink:0;font-family:'Noto Sans KR',sans-serif">수정</button>
+        <button onclick="removeChannel(${i})" style="border:1px solid var(--border);background:var(--surface);color:#dc2626;cursor:pointer;font-size:11px;padding:2px 8px;border-radius:4px;flex-shrink:0;font-family:'Noto Sans KR',sans-serif">삭제</button>
+      </div>`).join('');
+  }
+
+  // 드롭다운 동기화
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">채널 선택</option>' +
+    channels.map((ch, i) => `<option value="${i}">${ch.name}</option>`).join('');
+  if (prev !== '' && channels[parseInt(prev)]) sel.value = prev;
+}
+
+function editChannel(idx) {
+  const channels = getChannels();
+  const ch = channels[idx];
+  document.getElementById('cfg-ch-name').value = ch.name;
+  document.getElementById('cfg-ch-url').value  = ch.url;
+  removeChannel(idx);
+  // 추가 버튼 포커스
+  document.getElementById('cfg-ch-name').focus();
+}
+
+// ─────────────────────────────────────────
 // 설정 저장/로드
 // ─────────────────────────────────────────
 function saveSettings() {
-  localStorage.setItem('qa_cfg_webhook', document.getElementById('cfg-webhook').value);
-  localStorage.setItem('qa_cfg_script',  document.getElementById('cfg-script').value);
+  localStorage.setItem('qa_cfg_script', document.getElementById('cfg-script').value);
   updateSendBtn();
 }
 
 function loadSettings() {
-  document.getElementById('cfg-webhook').value = localStorage.getItem('qa_cfg_webhook') || '';
-  document.getElementById('cfg-script').value  = localStorage.getItem('qa_cfg_script')  || '';
+  document.getElementById('cfg-script').value = localStorage.getItem('qa_cfg_script') || '';
+  renderChannelList();
   updateSendBtn();
 }
 
@@ -1045,13 +1123,14 @@ function toggleSettings() {
 }
 
 function updateSendBtn() {
-  const hasConfig = !!(localStorage.getItem('qa_cfg_webhook') && localStorage.getItem('qa_cfg_script'));
-  const hasOutput = !!document.getElementById('output').dataset.generated;
-  document.getElementById('sendbtn').disabled = !(hasConfig && hasOutput);
+  const hasScript   = !!localStorage.getItem('qa_cfg_script');
+  const hasChannels = getChannels().length > 0;
+  const hasOutput   = !!document.getElementById('output').dataset.generated;
+  document.getElementById('sendbtn').disabled = !(hasScript && hasChannels && hasOutput);
 }
 
-document.getElementById('cfg-webhook').addEventListener('input', saveSettings);
-document.getElementById('cfg-script').addEventListener('input',  saveSettings);
+document.getElementById('cfg-script').addEventListener('input', saveSettings);
+document.getElementById('ch-select').addEventListener('change', updateSendBtn);
 
 // ─────────────────────────────────────────
 // Google Chat Card 빌더 (v1, 심플 구조)
@@ -1274,16 +1353,19 @@ function textBtn(label, url) {
 // Google Chat 전송 (hidden form submit — CORS 우회)
 // ─────────────────────────────────────────
 async function sendToChat() {
-  const webhookUrl = localStorage.getItem('qa_cfg_webhook');
   const scriptUrl  = localStorage.getItem('qa_cfg_script');
+  const chIdx      = document.getElementById('ch-select').value;
+  const channels   = getChannels();
+  const channel    = channels[chIdx];
   const statusEl   = document.getElementById('send-status');
   const btn        = document.getElementById('sendbtn');
 
-  if (!webhookUrl || !scriptUrl) {
-    statusEl.textContent = '⚠️ 설정에서 Webhook URL과 Apps Script URL을 입력해주세요.';
+  if (!scriptUrl || !channel) {
+    statusEl.textContent = '⚠️ 채널을 선택하고 Apps Script URL을 입력해주세요.';
     statusEl.className   = 'send-status err';
     return;
   }
+  const webhookUrl = channel.url;
 
   btn.disabled  = true;
   btn.innerHTML = '전송 중…';
@@ -1315,7 +1397,7 @@ async function sendToChat() {
     document.body.removeChild(form);
     setTimeout(() => { if (frame.parentNode) frame.parentNode.removeChild(frame); }, 5000);
 
-    statusEl.textContent = '✅ 전송 완료 — 구글챗 확인해주세요';
+    statusEl.textContent = `✅ [${channel.name}] 전송 완료 — 구글챗 확인해주세요`;
     statusEl.className   = 'send-status ok';
 
   } catch (err) {
