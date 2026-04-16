@@ -362,9 +362,13 @@ textarea{resize:vertical;min-height:54px;line-height:1.6}
   <!-- 테스트 결과 요약 (탐색/운영 종료) -->
   <div class="form-section hidden" id="section-summary">
     <div class="section-label">테스트 결과 요약</div>
+    <!-- 운영 종료 전용: 고정 헤더 표시 -->
+    <div id="ops-end-header" class="hidden" style="font-size:13px;font-weight:700;color:var(--text);padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);border-left:3px solid var(--accent)">
+      아래 항목 확인 결과, 이상 없습니다.
+    </div>
     <div class="field-row single">
       <div class="field">
-        <label>결과 요약 (줄바꿈으로 항목 구분)</label>
+        <label id="summary-label">결과 요약 (줄바꿈으로 항목 구분)</label>
         <textarea id="s-summary" rows="3" placeholder="이슈 처리 위주로 진행&#10;앱 강제 업데이트&#10;탐색적으로 진행"></textarea>
       </div>
     </div>
@@ -517,6 +521,7 @@ const DEPLOY_DATA = {
 const START_TYPES    = new Set(['integrated-start','explore-start','ops-start']);
 const END_TYPES      = new Set(['integrated-end','explore-end','ops-end']);
 const SIMPLE_ENDS    = new Set(['explore-end','ops-end']);
+const OPS_END        = 'ops-end';
 const MID_TYPE       = 'integrated-mid';
 
 let currentType   = 'integrated-start';
@@ -667,16 +672,22 @@ function updateFormSections() {
 
   // 결과 요약 (탐색/운영 종료)
   show('section-summary', isSimpleEnd);
+  // 운영 종료 전용 고정 헤더
+  show('ops-end-header', t === 'ops-end');
+  const summaryLabel = document.getElementById('summary-label');
+  if (summaryLabel) summaryLabel.textContent = t === 'ops-end'
+    ? '확인 항목 (줄바꿈으로 항목 구분)'
+    : '결과 요약 (줄바꿈으로 항목 구분)';
 
-  // 잔여이슈
-  show('section-remain', hasRemain);
+  // 잔여이슈 (중간 + 탐색종료 + 통합종료만, 운영종료 제외)
+  show('section-remain', hasRemain && t !== OPS_END);
 
   // 중간보고 전용
   show('section-key-issues', isMid);
   show('section-risk', isMid);
 
-  // 배포 (종료)
-  show('section-deploy', isEnd);
+  // 배포 (운영종료 제외한 종료)
+  show('section-deploy', isEnd && t !== OPS_END);
 
   // 비고 (탐색/운영 종료 제외)
   show('section-note', !isSimpleEnd);
@@ -722,22 +733,25 @@ function renderPreview() {
     : start + (isEnd || isMid ? '' : ' ~ 미정 (완료 시 별도 공유 예정)');
 
   let h = '';
-  h += `<div class="pv-title">${type.emoji} ${type.title}</div>`;
+  if (t !== 'ops-end') h += `<div class="pv-title">${type.emoji} ${type.title}</div>`;
+  else h += `<div class="pv-title">아래 항목 확인 결과, 이상 없습니다.</div>`;
 
-  // ── 기본 정보 ──
-  h += `<div class="pv-section">`;
-  const projVal = plink ? linkTag(plink, proj) : proj;
-  h += `<div class="pv-row"><span class="pv-key">프로젝트명 :</span><span class="pv-val">&nbsp;${projVal}</span></div>`;
-  h += `<div class="pv-row"><span class="pv-key">${isEnd ? '검증 기간' : '예상 검증 기간'} :</span><span class="pv-val">&nbsp;${period}</span></div>`;
-  h += `<div class="pv-row"><span class="pv-key">테스트 서버 :</span><span class="pv-val">&nbsp;${currentServer}</span></div>`;
-  h += `<div class="pv-row"><span class="pv-key">담당 QA :</span><span class="pv-val">&nbsp;${qa}</span></div>`;
-  if (isMid) {
-    const cur  = v('mid-progress-cur');
-    const goal = v('mid-progress-goal');
-    const mp   = cur ? (goal ? `${cur}% (목표 진행률: ${goal}%)` : `${cur}%`) : '';
-    if (mp) h += `<div class="pv-row"><span class="pv-bullet">•</span><span class="pv-val">&nbsp;누적 진행률: ${mp}</span></div>`;
+  // ── 기본 정보 (ops-end는 생략) ──
+  if (t !== 'ops-end') {
+    h += `<div class="pv-section">`;
+    const projVal = plink ? linkTag(plink, proj) : proj;
+    h += `<div class="pv-row"><span class="pv-key">프로젝트명 :</span><span class="pv-val">&nbsp;${projVal}</span></div>`;
+    h += `<div class="pv-row"><span class="pv-key">${isEnd ? '검증 기간' : '예상 검증 기간'} :</span><span class="pv-val">&nbsp;${period}</span></div>`;
+    h += `<div class="pv-row"><span class="pv-key">테스트 서버 :</span><span class="pv-val">&nbsp;${currentServer}</span></div>`;
+    h += `<div class="pv-row"><span class="pv-key">담당 QA :</span><span class="pv-val">&nbsp;${qa}</span></div>`;
+    if (isMid) {
+      const cur  = v('mid-progress-cur');
+      const goal = v('mid-progress-goal');
+      const mp   = cur ? (goal ? `${cur}% (목표 진행률: ${goal}%)` : `${cur}%`) : '';
+      if (mp) h += `<div class="pv-row"><span class="pv-bullet">•</span><span class="pv-val">&nbsp;누적 진행률: ${mp}</span></div>`;
+    }
+    h += `</div>`;
   }
-  h += `</div>`;
 
   // ── 시작: TC + 기기 + 이슈 ──
   if (isStart) {
@@ -802,15 +816,15 @@ function renderPreview() {
     const lines = (v('s-summary') || '').split('\n').filter(l => l.trim());
     if (lines.length > 0) {
       h += `<div class="pv-section">`;
-      h += `<div class="pv-head">테스트 결과 요약</div>`;
+      if (t !== 'ops-end') h += `<div class="pv-head" style="font-weight:700">테스트 결과 요약</div>`;
       h += `<div class="pv-list">`;
       lines.forEach(line => h += `<div class="pv-item"><span class="pv-bullet">•</span><span>${line}</span></div>`);
       h += `</div></div>`;
     }
   }
 
-  // ── 잔여 이슈 (중간 + 종료) ──
-  if (isMid || isEnd) {
+  // ── 잔여 이슈 (중간 + 종료, 운영종료 제외) ──
+  if ((isMid || isEnd) && t !== OPS_END) {
     const ilink = v('i-link');
     h += `<div class="pv-section">`;
     h += `<div class="pv-head">잔여 이슈 현황${ilink ? ` 🔗 ${linkTag(ilink, '잔여 이슈 보기')}` : ''}</div>`;
@@ -848,8 +862,8 @@ function renderPreview() {
     }
   }
 
-  // ── 배포 가능 여부 (종료) ──
-  if (isEnd) {
+  // ── 배포 가능 여부 (운영종료 제외한 종료) ──
+  if (isEnd && t !== OPS_END) {
     const satisfy = DEPLOY_DATA[currentDeploy].satisfy;
     const opinion = v('d-opinion') || DEPLOY_DATA[currentDeploy].opinion;
     h += `<div class="pv-section">`;
@@ -902,19 +916,24 @@ function buildPlainText(includeUrls = false) {
     : start + (isEnd || isMid ? '' : ' ~ 미정 (완료 시 별도 공유 예정)');
 
   const L = [];
-  L.push(`*${type.emoji} ${type.title}*`);
-  L.push('');
+  if (t !== 'ops-end') {
+    L.push(`*${type.emoji} ${type.title}*`);
+    L.push('');
+  }
 
-  const projDisp = (includeUrls && plink) ? `${proj} (${plink})` : proj;
-  L.push(`*프로젝트명* : ${projDisp}`);
-  L.push(`*${isEnd ? '검증 기간' : '예상 검증 기간'}* : ${period}`);
-  L.push(`*테스트 서버* : ${currentServer}`);
-  L.push(`*담당 QA* : ${qa}`);
-  if (isMid) {
-    const cur  = v('mid-progress-cur');
-    const goal = v('mid-progress-goal');
-    const mp   = cur ? (goal ? `${cur}% (목표 진행률: ${goal}%)` : `${cur}%`) : '';
-    if (mp) L.push(`• 누적 진행률: ${mp}`);
+  // ops-end는 기본 정보 생략
+  if (t !== 'ops-end') {
+    const projDisp = (includeUrls && plink) ? `${proj} (${plink})` : proj;
+    L.push(`*프로젝트명* : ${projDisp}`);
+    L.push(`*${isEnd ? '검증 기간' : '예상 검증 기간'}* : ${period}`);
+    L.push(`*테스트 서버* : ${currentServer}`);
+    L.push(`*담당 QA* : ${qa}`);
+    if (isMid) {
+      const cur  = v('mid-progress-cur');
+      const goal = v('mid-progress-goal');
+      const mp   = cur ? (goal ? `${cur}% (목표 진행률: ${goal}%)` : `${cur}%`) : '';
+      if (mp) L.push(`• 누적 진행률: ${mp}`);
+    }
   }
 
   if (isStart) {
@@ -968,12 +987,12 @@ function buildPlainText(includeUrls = false) {
     const lines = (v('s-summary') || '').split('\n').filter(l => l.trim());
     if (lines.length > 0) {
       L.push('');
-      L.push('*테스트 결과 요약*');
+      L.push(t === 'ops-end' ? '*아래 항목 확인 결과, 이상 없습니다.*' : '*테스트 결과 요약*');
       lines.forEach(l => L.push(`• ${l}`));
     }
   }
 
-  if (isMid || isEnd) {
+  if ((isMid || isEnd) && t !== OPS_END) {
     const ilink = v('i-link');
     L.push('');
     L.push(`*잔여 이슈 현황*${ilink ? (includeUrls ? ' 🔗 ' + ilink : ' 🔗 잔여 이슈 보기') : ''}`);
@@ -1002,7 +1021,7 @@ function buildPlainText(includeUrls = false) {
     }
   }
 
-  if (isEnd) {
+  if (isEnd && t !== OPS_END) {
     const satisfy = DEPLOY_DATA[currentDeploy].satisfy;
     const opinion = v('d-opinion') || DEPLOY_DATA[currentDeploy].opinion;
     L.push('');
@@ -1220,27 +1239,28 @@ function buildCardPayload() {
 
   const widgets = [];
 
-  // ── 기본 정보 ──
-  // 프로젝트명: 링크 있으면 keyValue(content에 볼드헤더+값), 없으면 textParagraph 포함
-  if (plink) {
-    widgets.push({ keyValue: {
-      topLabel: '',
-      content:  `<b>프로젝트명</b> : ${proj}`,
-      button:   { textButton: { text: '링크 열기', onClick: { openLink: { url: plink } } } }
-    }});
+  // ── 기본 정보 (ops-end는 생략) ──
+  if (t !== 'ops-end') {
+    if (plink) {
+      widgets.push({ keyValue: {
+        topLabel: '',
+        content:  `<b>프로젝트명</b> : ${proj}`,
+        button:   { textButton: { text: '링크 열기', onClick: { openLink: { url: plink } } } }
+      }});
+    }
+    const infoLines = [];
+    if (!plink) infoLines.push(`<b>프로젝트명</b> : ${proj}`);
+    infoLines.push(`${isEnd ? '검증 기간' : '예상 검증 기간'} : ${period}`);
+    infoLines.push(`테스트 서버 : ${currentServer}`);
+    infoLines.push(`담당 QA : ${qa}`);
+    if (isMid) {
+      const cur  = v('mid-progress-cur');
+      const goal = v('mid-progress-goal');
+      const mp   = cur ? (goal ? `${cur}% (목표 진행률: ${goal}%)` : `${cur}%`) : '';
+      if (mp) infoLines.push(`누적 진행률 : ${mp}`);
+    }
+    widgets.push({ textParagraph: { text: infoLines.join('\n') } });
   }
-  const infoLines = [];
-  if (!plink) infoLines.push(`<b>프로젝트명</b> : ${proj}`);
-  infoLines.push(`${isEnd ? '검증 기간' : '예상 검증 기간'} : ${period}`);
-  infoLines.push(`테스트 서버 : ${currentServer}`);
-  infoLines.push(`담당 QA : ${qa}`);
-  if (isMid) {
-    const cur  = v('mid-progress-cur');
-    const goal = v('mid-progress-goal');
-    const mp   = cur ? (goal ? `${cur}% (목표 진행률: ${goal}%)` : `${cur}%`) : '';
-    if (mp) infoLines.push(`누적 진행률 : ${mp}`);
-  }
-  widgets.push({ textParagraph: { text: infoLines.join('\n') } });
 
   // ── 시작: TC + 기기 + 이슈 ──
   if (isStart) {
@@ -1318,14 +1338,16 @@ function buildCardPayload() {
   if (isSimpleEnd) {
     const lines2 = (v('s-summary') || '').split('\n').filter(l => l.trim());
     if (lines2.length > 0) {
+      const header = t === 'explore-end' ? '<b>테스트 결과 요약</b>' : '';
+      const prefix = header ? header + '\n' : '';
       widgets.push({ textParagraph: {
-        text: '<b>테스트 결과 요약</b>\n' + lines2.map(l => `• ${l}`).join('\n')
+        text: prefix + lines2.map(l => `• ${l}`).join('\n')
       }});
     }
   }
 
-  // ── 잔여 이슈 ──
-  if (isMid || isEnd) {
+  // ── 잔여 이슈 (운영종료 제외) ──
+  if ((isMid || isEnd) && t !== OPS_END) {
     const ilink = v('i-link');
     const issueContent = isNoIssues() ? '없음'
       : `Critical: ${v('i-critical')||'0'}건  High: ${v('i-high')||'0'}건  Medium: ${v('i-medium')||'0'}건  Low: ${v('i-low')||'0'}건`;
@@ -1377,8 +1399,8 @@ function buildCardPayload() {
     }
   }
 
-  // ── 배포 ──
-  if (isEnd) {
+  // ── 배포 (운영종료 제외) ──
+  if (isEnd && t !== OPS_END) {
     const satisfy = DEPLOY_DATA[currentDeploy].satisfy;
     const opinion = v('d-opinion') || DEPLOY_DATA[currentDeploy].opinion;
     widgets.push({ textParagraph: {
@@ -1402,7 +1424,7 @@ function buildCardPayload() {
 
   return {
     cards: [{
-      header: { title: `${type.emoji} ${type.title}` },
+      header: { title: t === 'ops-end' ? '아래 항목 확인 결과, 이상 없습니다.' : `${type.emoji} ${type.title}` },
       sections: [{ widgets }]
     }]
   };
@@ -1439,7 +1461,7 @@ async function sendToChat() {
     // 편집된 내용이 있으면 text 포맷으로, 없으면 카드 포맷으로 전송
     const currentText = (editMode || isEdited) ? document.getElementById('output').innerText : null;
     if (currentText) rawText = currentText;
-    const chatPayload = (editMode || isEdited) ? { text: rawText } : buildCardPayload();
+    const chatPayload = (editMode || isEdited) ? buildEditedCardPayload() : buildCardPayload();
     const sendData = JSON.stringify({
       webhookUrl,
       payload: chatPayload
@@ -1478,6 +1500,22 @@ async function sendToChat() {
     setTimeout(() => { statusEl.textContent = ''; statusEl.className = 'send-status'; }, 6000);
   }
 }
+// 편집 후에도 링크 버튼 보존하는 카드 빌더
+function buildEditedCardPayload() {
+  const widgets = [];
+  // 편집된 텍스트를 본문으로
+  widgets.push({ textParagraph: { text: rawText.replace(/\*/g, '') } });
+  // 폼에 입력된 링크들을 버튼으로 추가
+  const linkBtns = [];
+  if (v('projlink'))  linkBtns.push(textBtn('프로젝트 링크', v('projlink')));
+  if (v('tclink'))    linkBtns.push(textBtn('TC 링크', v('tclink')));
+  if (v('r-tclink'))  linkBtns.push(textBtn('TC 상세 보기', v('r-tclink')));
+  if (v('issuelink')) linkBtns.push(textBtn(currentType === 'ops-start' ? '운영 이슈 목록' : '이슈 목록', v('issuelink')));
+  if (v('i-link'))    linkBtns.push(textBtn('잔여 이슈 보기', v('i-link')));
+  if (linkBtns.length > 0) widgets.push({ buttons: linkBtns });
+  return { cards: [{ sections: [{ widgets }] }] };
+}
+
 // ─────────────────────────────────────────
 // 편집 모드
 // ─────────────────────────────────────────
